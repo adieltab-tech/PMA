@@ -1,0 +1,1879 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Ejecutivo PMA | MG Lomas Verdes &amp; MG Toreo - Grupo Car One</title>
+
+  <!-- Fuente Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            mgRed: '#E30613',
+            mgRedDark: '#B3040E',
+            toreoCyan: '#06b6d4',
+            slateBg: '#0f172a',
+            slateCard: '#1e293b',
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Leaflet CSS & JS (Mapa Interactivo Real) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* Estilos base para scrollbar y popups oscuros de Leaflet */
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: 'Inter', sans-serif;
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Personalización de Leaflet para Modo Oscuro */
+    .leaflet-container {
+      background: #0b1120 !important;
+      font-family: 'Inter', sans-serif !important;
+    }
+    .leaflet-popup-content-wrapper,
+    .leaflet-popup-tip {
+      background-color: #1e293b !important;
+      color: #f8fafc !important;
+      border: 1px solid #334155;
+      border-radius: 0.75rem !important;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6) !important;
+    }
+    .leaflet-popup-close-button {
+      color: #94a3b8 !important;
+      padding: 6px !important;
+    }
+    .leaflet-popup-close-button:hover {
+      color: #ffffff !important;
+    }
+    .leaflet-control-attribution {
+      background: rgba(15, 23, 42, 0.75) !important;
+      color: #94a3b8 !important;
+      font-size: 10px !important;
+    }
+    .leaflet-control-attribution a {
+      color: #cbd5e1 !important;
+    }
+
+    /* Filtro opcional para Modo Oscuro sobre OpenStreetMap (sin requerir API Key) */
+    .map-dark-filter .leaflet-tile-pane {
+      filter: invert(100%) hue-rotate(180deg) brightness(92%) contrast(92%) saturate(85%);
+    }
+
+    /* Animación suave para toast */
+    @keyframes slideInUp {
+      from {
+        transform: translateY(20px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    .toast-enter {
+      animation: slideInUp 0.25s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-900 text-slate-100 antialiased selection:bg-mgRed selection:text-white">
+
+  <!-- Contenedor de Notificaciones Toast (Sin alert/confirm) -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- =====================================================================
+       1. HEADER EJECUTIVO Y FILTROS GLOBALES
+  ====================================================================== -->
+  <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-lg">
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+
+        <!-- Identidad Corporativa -->
+        <div class="flex items-center gap-3.5">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-mgRed to-red-800 flex items-center justify-center shadow-lg shadow-mgRed/20 border border-red-500/30 shrink-0">
+            <span class="font-extrabold text-white tracking-tighter text-lg">MG</span>
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h1 class="text-lg sm:text-xl font-bold tracking-tight text-white">
+                Dashboard Ejecutivo PMA
+              </h1>
+              <span class="px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                Grupo Car One
+              </span>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-400">
+              Inteligencia Territorial &amp; Estrategia Comercial · <span class="text-red-400 font-medium">Lomas Verdes</span> vs <span class="text-cyan-400 font-medium">Toreo</span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Filtros Globales Dinámicos -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <!-- Selector de Sucursal -->
+          <div class="flex items-center gap-2 bg-slate-800/90 border border-slate-700/80 rounded-xl px-3 py-2">
+            <i data-lucide="building-2" class="w-4 h-4 text-slate-400 shrink-0"></i>
+            <label for="filter-branch" class="text-xs font-medium text-slate-400 whitespace-nowrap">Sucursal:</label>
+            <select id="filter-branch" class="bg-transparent text-sm font-semibold text-white focus:outline-none cursor-pointer pr-2 w-full sm:w-auto">
+              <option value="ALL" class="bg-slate-800 text-white">Comparativo (Ambas)</option>
+              <option value="LV" class="bg-slate-800 text-white">MG Lomas Verdes</option>
+              <option value="TOR" class="bg-slate-800 text-white">MG Toreo</option>
+            </select>
+          </div>
+
+          <!-- Selector de Modelo -->
+          <div class="flex items-center gap-2 bg-slate-800/90 border border-slate-700/80 rounded-xl px-3 py-2">
+            <i data-lucide="car" class="w-4 h-4 text-slate-400 shrink-0"></i>
+            <label for="filter-model" class="text-xs font-medium text-slate-400 whitespace-nowrap">Modelo:</label>
+            <select id="filter-model" class="bg-transparent text-sm font-semibold text-white focus:outline-none cursor-pointer pr-2 w-full sm:w-auto">
+              <option value="ALL" class="bg-slate-800 text-white">Todos los Modelos (5)</option>
+              <option value="MG3" class="bg-slate-800 text-white">MG3 (Gas / Hybrid+)</option>
+              <option value="MG5" class="bg-slate-800 text-white">MG5</option>
+              <option value="ZS" class="bg-slate-800 text-white">MG ZS (Gas / Hybrid+)</option>
+              <option value="HS" class="bg-slate-800 text-white">MG HS (Gas / PHEV)</option>
+              <option value="RX9" class="bg-slate-800 text-white">MG RX9</option>
+            </select>
+          </div>
+
+          <!-- Botón Reset Filtros -->
+          <button id="btn-reset-filters" title="Restablecer filtros" class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-300 hover:text-white transition-colors">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+            <span>Reset</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- =====================================================================
+       CONTENIDO PRINCIPAL
+  ====================================================================== -->
+  <main class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Indicador de Contexto Activo -->
+    <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 bg-slate-800/40 border border-slate-800 rounded-xl px-4 py-2.5">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>Vista activa: <strong id="active-view-label" class="text-slate-200">Comparativo (Ambas Sucursales) · Todos los Modelos</strong></span>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-mgRed"></span> MG Lomas Verdes</span>
+        <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-toreoCyan"></span> MG Toreo</span>
+      </div>
+    </div>
+
+    <!-- ===================================================================
+         2. FILA DE 4 TARJETAS KPI PRINCIPALES
+    ==================================================================== -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <!-- KPI 1: Leads Mensuales Estimados -->
+      <div class="bg-slate-800/80 border border-slate-700/70 rounded-2xl p-5 shadow-lg hover:border-slate-600 transition-all">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Leads Mensuales Objetivo</p>
+            <h2 id="kpi-leads" class="text-3xl font-extrabold text-white mt-1.5 tracking-tight">--</h2>
+          </div>
+          <div class="p-2.5 rounded-xl bg-mgRed/15 text-mgRed border border-mgRed/20">
+            <i data-lucide="users" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center justify-between text-xs">
+          <span id="kpi-leads-sub" class="text-slate-400">--</span>
+          <span class="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-semibold border border-emerald-500/20">
+            +12.2% YoY MG
+          </span>
+        </div>
+      </div>
+
+      <!-- KPI 2: Efectividad Territorial (Anti-Canibalización) -->
+      <div class="bg-slate-800/80 border border-slate-700/70 rounded-2xl p-5 shadow-lg hover:border-slate-600 transition-all">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Efectividad Territorial PMA</p>
+            <h2 id="kpi-pma-eff" class="text-3xl font-extrabold text-emerald-400 mt-1.5 tracking-tight">--%</h2>
+          </div>
+          <div class="p-2.5 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+            <i data-lucide="shield-check" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="mt-4 space-y-1.5">
+          <div class="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+            <div id="kpi-pma-bar" class="h-full bg-emerald-400 rounded-full transition-all duration-500" style="width: 88%"></div>
+          </div>
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400">Dentro de PMA asignado</span>
+            <span id="kpi-pma-cross" class="text-amber-400 font-medium">--% cruzados</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 3: Pruebas de Manejo y Cierres Estimados -->
+      <div class="bg-slate-800/80 border border-slate-700/70 rounded-2xl p-5 shadow-lg hover:border-slate-600 transition-all">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Pruebas de Manejo / Cierres</p>
+            <div class="flex items-baseline gap-2 mt-1.5">
+              <h2 id="kpi-demos" class="text-3xl font-extrabold text-white tracking-tight">--</h2>
+              <span class="text-slate-500 text-lg font-light">/</span>
+              <span id="kpi-sales" class="text-2xl font-bold text-cyan-400">--</span>
+              <span class="text-xs text-slate-400 font-medium">uds</span>
+            </div>
+          </div>
+          <div class="p-2.5 rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/20">
+            <i data-lucide="gauge" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center justify-between text-xs">
+          <span id="kpi-conv-demo" class="text-slate-400">Tasa Prueba: --%</span>
+          <span id="kpi-conv-close" class="text-cyan-300 font-semibold">Cierre s/Lead: --%</span>
+        </div>
+      </div>
+
+      <!-- KPI 4: CPL y CPA Promedio en MXN -->
+      <div class="bg-slate-800/80 border border-slate-700/70 rounded-2xl p-5 shadow-lg hover:border-slate-600 transition-all">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">CPL / CPA Promedio (MXN)</p>
+            <div class="flex items-baseline gap-2 mt-1.5">
+              <h2 id="kpi-cpl" class="text-2xl sm:text-3xl font-extrabold text-amber-400 tracking-tight">$--</h2>
+              <span class="text-xs text-slate-400 font-medium">CPL</span>
+            </div>
+          </div>
+          <div class="p-2.5 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/20">
+            <i data-lucide="badge-dollar-sign" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center justify-between text-xs">
+          <span class="text-slate-400">Costo por Venta (CPA):</span>
+          <span id="kpi-cpa" class="font-bold text-white bg-slate-700/80 px-2 py-0.5 rounded-md">$-- MXN</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         3. MAPA INTERACTIVO PMA + SIMULADOR DE PRESUPUESTO
+    ==================================================================== -->
+    <section class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+
+      <!-- Mapa Interactivo de Territorio PMA (7 columnas en XL) -->
+      <div class="xl:col-span-7 bg-slate-800/80 border border-slate-700/70 rounded-2xl p-5 shadow-lg flex flex-col">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="map" class="w-4 h-4 text-mgRed"></i>
+              Mapa Interactivo de Territorio PMA (Naucalpan · Edo. Méx. · CDMX)
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Haz clic en los marcadores o anillos concéntricos para ver el detalle territorial y evitar canibalización.
+            </p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <!-- Selector de estilo de mapa (Calles / Satélite / Oscuro) -->
+            <div class="inline-flex rounded-lg bg-slate-900/90 p-0.5 border border-slate-700">
+              <button data-map-style="streets" class="map-style-btn px-2.5 py-1 rounded-md text-[11px] font-semibold bg-mgRed text-white transition-colors">
+                Calles
+              </button>
+              <button data-map-style="satellite" class="map-style-btn px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-300 hover:text-white transition-colors">
+                Satélite
+              </button>
+              <button data-map-style="dark" class="map-style-btn px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-300 hover:text-white transition-colors">
+                Oscuro
+              </button>
+            </div>
+            <button id="btn-center-map" class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors shrink-0">
+              <i data-lucide="crosshair" class="w-3.5 h-3.5"></i>
+              Centrar
+            </button>
+          </div>
+        </div>
+
+        <!-- Botones de Control de Capas del Mapa -->
+        <div class="flex flex-wrap gap-2 mb-3">
+          <button data-layer="lvRings" class="layer-toggle active inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all bg-mgRed/20 border-mgRed/60 text-red-200">
+            <span class="w-2 h-2 rounded-full bg-mgRed"></span>
+            Anillos Lomas Verdes
+          </button>
+          <button data-layer="torRings" class="layer-toggle active inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all bg-cyan-500/20 border-cyan-500/60 text-cyan-200">
+            <span class="w-2 h-2 rounded-full bg-toreoCyan"></span>
+            Anillos Toreo
+          </button>
+          <button data-layer="btlPoints" class="layer-toggle active inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all bg-emerald-500/20 border-emerald-500/60 text-emerald-200">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            Puntos BTL (7)
+          </button>
+          <button data-layer="neighbors" class="layer-toggle active inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all bg-amber-500/20 border-amber-500/60 text-amber-200">
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+            Fronteras MG Vecinas (4)
+          </button>
+        </div>
+
+        <!-- Contenedor del Mapa Leaflet -->
+        <div class="relative w-full h-[380px] sm:h-[440px] rounded-xl overflow-hidden border border-slate-700 z-10">
+          <div id="pma-map" class="w-full h-full"></div>
+        </div>
+
+        <!-- Leyenda Compacta -->
+        <div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-400">
+          <div class="bg-slate-900/60 rounded-lg px-2.5 py-1.5 border border-slate-700/50">
+            <span class="text-red-400 font-semibold">LV Anillos:</span> 3km / 7km / 12km
+          </div>
+          <div class="bg-slate-900/60 rounded-lg px-2.5 py-1.5 border border-slate-700/50">
+            <span class="text-cyan-400 font-semibold">Toreo Anillos:</span> 3km / 6km / 9km
+          </div>
+          <div class="bg-slate-900/60 rounded-lg px-2.5 py-1.5 border border-slate-700/50">
+            <span class="text-emerald-400 font-semibold">BTL:</span> Plazas, Unis e Ind.
+          </div>
+          <div class="bg-slate-900/60 rounded-lg px-2.5 py-1.5 border border-slate-700/50">
+            <span class="text-amber-400 font-semibold">Frontera:</span> Exclusión Pauta
+          </div>
+        </div>
+      </div>
+
+      <!-- Simulador Rápido de Presupuesto de Pauta (5 columnas en XL) -->
+      <div class="xl:col-span-5 bg-slate-800/80 border border-slate-700/70 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between gap-2 mb-4">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="calculator" class="w-4 h-4 text-amber-400"></i>
+                Simulador de Presupuesto de Pauta
+              </h3>
+              <p class="text-xs text-slate-400 mt-0.5">
+                Ajusta la inversión mensual (MXN) para recalcular el reparto por modelo, anillo y KPIs.
+              </p>
+            </div>
+            <span id="sim-total-badge" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs font-bold text-emerald-400 whitespace-nowrap">
+              $120,000 MXN
+            </span>
+          </div>
+
+          <!-- Inputs Editables de Presupuesto -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+            <div class="bg-slate-900/70 border border-mgRed/40 rounded-xl p-3">
+              <label for="input-budget-lv" class="flex items-center justify-between text-xs font-semibold text-red-300 mb-1.5">
+                <span>MG Lomas Verdes</span>
+                <span class="text-[10px] uppercase text-slate-400">MXN / Mes</span>
+              </label>
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-sm">$</span>
+                <input
+                  id="input-budget-lv"
+                  type="number"
+                  min="0"
+                  max="5000000"
+                  step="1000"
+                  value="65000"
+                  class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-7 pr-3 py-2 text-sm font-bold text-white focus:outline-none focus:border-mgRed transition-colors"
+                />
+              </div>
+            </div>
+
+            <div class="bg-slate-900/70 border border-cyan-500/40 rounded-xl p-3">
+              <label for="input-budget-tor" class="flex items-center justify-between text-xs font-semibold text-cyan-300 mb-1.5">
+                <span>MG Toreo</span>
+                <span class="text-[10px] uppercase text-slate-400">MXN / Mes</span>
+              </label>
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-sm">$</span>
+                <input
+                  id="input-budget-tor"
+                  type="number"
+                  min="0"
+                  max="5000000"
+                  step="1000"
+                  value="55000"
+                  class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-7 pr-3 py-2 text-sm font-bold text-white focus:outline-none focus:border-toreoCyan transition-colors"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Desglose en Tiempo Real por Modelo -->
+          <div class="mb-4">
+            <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+              Asignación por Modelo (Según Mix Objetivo)
+            </h4>
+            <div class="overflow-x-auto rounded-xl border border-slate-700/70">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-900/80 text-slate-400 uppercase text-[10px]">
+                  <tr>
+                    <th class="px-3 py-2">Modelo</th>
+                    <th class="px-3 py-2 text-right text-red-300">Lomas Verdes</th>
+                    <th class="px-3 py-2 text-right text-cyan-300">Toreo</th>
+                    <th class="px-3 py-2 text-right text-white">Total</th>
+                  </tr>
+                </thead>
+                <tbody id="sim-model-tbody" class="divide-y divide-slate-700/50 bg-slate-800/40">
+                  <!-- Renderizado dinámico por JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Desglose en Tiempo Real por Anillo Geográfico -->
+          <div>
+            <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+              Asignación por Anillo Geográfico
+            </h4>
+            <div id="sim-ring-cards" class="grid grid-cols-3 gap-2">
+              <!-- Renderizado dinámico por JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ===================================================================
+         4. GRÁFICAS ANALÍTICAS INTERACTIVAS (Chart.js)
+    ==================================================================== -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Gráfica 1: Mix de Ventas Objetivo por Modelo (%) -->
+      <div class="bg-slate-800/80 border border-slate-700/70 rounded-2xl p-5 shadow-lg flex flex-col">
+        <div class="mb-3">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 text-mgRed"></i>
+            Mix de Ventas Objetivo por Modelo (%)
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Participación estratégica por sucursal</p>
+        </div>
+        <div class="relative flex-1 min-h-[250px] w-full">
+          <canvas id="chart-mix"></canvas>
+        </div>
+      </div>
+
+      <!-- Gráfica 2: Embudo de Conversión Comercial -->
+      <div class="bg-slate-800/80 border border-slate-700/70 rounded-2xl p-5 shadow-lg flex flex-col">
+        <div class="mb-3">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="filter" class="w-4 h-4 text-emerald-400"></i>
+            Embudo de Conversión Comercial
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Proyección mensual Leads &rarr; Cierres</p>
+        </div>
+        <div class="relative flex-1 min-h-[250px] w-full">
+          <canvas id="chart-funnel"></canvas>
+        </div>
+      </div>
+
+      <!-- Gráfica 3: Distribución de Pauta por Anillo Geográfico -->
+      <div class="bg-slate-800/80 border border-slate-700/70 rounded-2xl p-5 shadow-lg flex flex-col">
+        <div class="mb-3">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="radar" class="w-4 h-4 text-toreoCyan"></i>
+            Distribución de Pauta por Anillo (%)
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Concentración presupuestal Anillo 1, 2 y 3</p>
+        </div>
+        <div class="relative flex-1 min-h-[250px] w-full">
+          <canvas id="chart-rings"></canvas>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ===================================================================
+         5. PESTAÑAS INFERIORES: BENCHMARK COMPETITIVO & MAESTRO CP
+    ==================================================================== -->
+    <section class="bg-slate-800/80 border border-slate-700/70 rounded-2xl shadow-lg overflow-hidden">
+
+      <!-- Barra de Tabs + Acción Exportar CSV -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 pt-4 pb-3 border-b border-slate-700/80 bg-slate-900/40">
+        <div class="flex items-center gap-2">
+          <button id="tab-btn-benchmark" class="tab-btn active px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-mgRed text-white shadow-md shadow-mgRed/20">
+            <span class="inline-flex items-center gap-1.5">
+              <i data-lucide="trophy" class="w-4 h-4"></i>
+              Benchmark Competitivo (INEGI 2025)
+            </span>
+          </button>
+          <button id="tab-btn-cp" class="tab-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700">
+            <span class="inline-flex items-center gap-1.5">
+              <i data-lucide="map-pin" class="w-4 h-4"></i>
+              Maestro de Códigos Postales (PMA)
+            </span>
+          </button>
+        </div>
+
+        <button id="btn-export-csv" class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors shadow-md shadow-emerald-900/30">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span id="export-btn-label">Exportar Benchmark CSV</span>
+        </button>
+      </div>
+
+      <!-- TAB A: BENCHMARK COMPETITIVO -->
+      <div id="tab-panel-benchmark" class="p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <p class="text-xs text-slate-400">
+            Comparativa de volumen anual nacional/ZMVM (INEGI 2025) frente a los rivales directos de los 5 modelos prioritarios de MG.
+          </p>
+          <span id="benchmark-count" class="text-xs font-semibold text-slate-300">Mostrando 5 modelos</span>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-700/70">
+          <table class="w-full text-left text-xs sm:text-sm">
+            <thead class="bg-slate-900/90 text-slate-400 uppercase text-[11px]">
+              <tr>
+                <th class="px-4 py-3">Modelo MG</th>
+                <th class="px-4 py-3">Segmento</th>
+                <th class="px-4 py-3">Volumen MG (2025)</th>
+                <th class="px-4 py-3">Rivales Líderes (INEGI 2025)</th>
+                <th class="px-4 py-3">Mayor Ventaja Competitiva</th>
+                <th class="px-4 py-3">Enfoque Comercial Clave</th>
+              </tr>
+            </thead>
+            <tbody id="benchmark-tbody" class="divide-y divide-slate-700/60 bg-slate-800/30">
+              <!-- Renderizado dinámico por JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB B: MAESTRO DE CÓDIGOS POSTALES (PMA) -->
+      <div id="tab-panel-cp" class="p-5 hidden">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <!-- Buscador en Tiempo Real -->
+          <div class="relative w-full sm:max-w-md">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+            <input
+              id="cp-search-input"
+              type="text"
+              placeholder="Buscar por CP, colonia, NSE o modelo (ej. 53150, Satélite, RX9)..."
+              class="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-mgRed transition-colors"
+            />
+          </div>
+          <div class="flex items-center gap-3 text-xs text-slate-400">
+            <span id="cp-count" class="font-semibold text-slate-200">22 zonas listadas</span>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-700/70 max-h-[420px] overflow-y-auto">
+          <table class="w-full text-left text-xs sm:text-sm">
+            <thead class="bg-slate-900 text-slate-400 uppercase text-[11px] sticky top-0 z-10">
+              <tr>
+                <th class="px-4 py-3">Código Postal</th>
+                <th class="px-4 py-3">Colonia / Zona</th>
+                <th class="px-4 py-3">Sucursal Asignada</th>
+                <th class="px-4 py-3">Anillo PMA</th>
+                <th class="px-4 py-3">NSE Predominante</th>
+                <th class="px-4 py-3">Modelos Prioritarios</th>
+              </tr>
+            </thead>
+            <tbody id="cp-tbody" class="divide-y divide-slate-700/60 bg-slate-800/30">
+              <!-- Renderizado dinámico por JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center sm:flex sm:items-center sm:justify-between text-xs text-slate-500 border-t border-slate-800/80 mt-6">
+    <p>Grupo Car One · Inteligencia Comercial PMA (MG Lomas Verdes &amp; MG Toreo)</p>
+    <p class="mt-1 sm:mt-0">Datos de referencia: INEGI / AMDA 2025–2026 &amp; Modelo de Atribución Territorial</p>
+  </footer>
+
+  <!-- =====================================================================
+       LÓGICA JAVASCRIPT DEL DASHBOARD
+  ====================================================================== -->
+  <script>
+    /**
+     * =========================================================================
+     * 1. DATOS MAESTROS Y CONFIGURACIÓN DEL MODELO DE NEGOCIO
+     * =========================================================================
+     */
+    const MODELS = ['MG3', 'MG5', 'ZS', 'HS', 'RX9'];
+
+    const MODEL_LABELS = {
+      MG3: 'MG3',
+      MG5: 'MG5',
+      ZS: 'MG ZS',
+      HS: 'MG HS',
+      RX9: 'MG RX9'
+    };
+
+    // Mix de ventas objetivo (%) por sucursal
+    const BRANCH_DATA = {
+      LV: {
+        name: 'MG Lomas Verdes',
+        shortName: 'Lomas Verdes',
+        address: 'Av. San Mateo 2, Santa Cruz Acatlán, C.P. 53150, Naucalpan',
+        coords: [19.5039, -99.2478],
+        color: '#E30613',
+        mix: { ZS: 35, HS: 25, MG3: 18, MG5: 12, RX9: 10 },
+        rings: [
+          { ring: 1, radiusKm: 3, pct: 50, label: 'Anillo 1 (Núcleo 0–3 km)' },
+          { ring: 2, radiusKm: 7, pct: 30, label: 'Anillo 2 (Consolidación 3–7 km)' },
+          { ring: 3, radiusKm: 12, pct: 20, label: 'Anillo 3 (Expansión 7–12 km)' }
+        ],
+        pmaEfficiency: 89.4, // % de leads dentro del PMA
+        // Parámetros base por modelo para estimar CPL (MXN) y tasas de embudo
+        cplByModel: { MG3: 155, MG5: 145, ZS: 165, HS: 215, RX9: 295 },
+        funnelRates: {
+          contacted: 0.78,
+          appointment: 0.34,
+          testDrive: 0.21,
+          sale: 0.088
+        }
+      },
+      TOR: {
+        name: 'MG Toreo',
+        shortName: 'Toreo',
+        address: 'Perif. Blvd. Manuel Ávila Camacho 555, San Andrés Atoto, C.P. 53500',
+        coords: [19.4577, -99.2225],
+        color: '#06b6d4',
+        mix: { MG5: 35, MG3: 25, ZS: 25, HS: 10, RX9: 5 },
+        rings: [
+          { ring: 1, radiusKm: 3, pct: 50, label: 'Anillo 1 (Núcleo 0–3 km)' },
+          { ring: 2, radiusKm: 6, pct: 35, label: 'Anillo 2 (Consolidación 3–6 km)' },
+          { ring: 3, radiusKm: 9, pct: 15, label: 'Anillo 3 (Expansión 6–9 km)' }
+        ],
+        pmaEfficiency: 86.2,
+        cplByModel: { MG3: 135, MG5: 120, ZS: 150, HS: 205, RX9: 280 },
+        funnelRates: {
+          contacted: 0.75,
+          appointment: 0.31,
+          testDrive: 0.185,
+          sale: 0.082
+        }
+      }
+    };
+
+    // Puntos calientes para activaciones BTL
+    const BTL_POINTS = [
+      { name: 'La Cúspide Sky Mall', branch: 'LV', coords: [19.5125, -99.2615], type: 'Plaza Comercial', focus: 'ZS, HS, RX9' },
+      { name: 'Gran Terraza Lomas Verdes', branch: 'LV', coords: [19.5105, -99.2570], type: 'Plaza Comercial', focus: 'ZS, HS, MG3 Hybrid+' },
+      { name: 'Espacio Esmeralda', branch: 'LV', coords: [19.5468, -99.2865], type: 'Plaza Premium (Anillo 3)', focus: 'HS PHEV, RX9' },
+      { name: 'FES Acatlán (UNAM)', branch: 'LV', coords: [19.4832, -99.2463], type: 'Universitario', focus: 'MG3, MG5' },
+      { name: 'Toreo Parque Central', branch: 'TOR', coords: [19.4545, -99.2185], type: 'Plaza / Corporativo', focus: 'MG5, MG3, ZS' },
+      { name: 'Parque Industrial Alce Blanco', branch: 'TOR', coords: [19.4755, -99.2290], type: 'Zona B2B / Flotillas', focus: 'MG5, MG3, Flotillas' },
+      { name: 'Tecamachalco Comercial', branch: 'TOR', coords: [19.4240, -99.2365], type: 'Zona Residencial/Comercial', focus: 'ZS, HS' }
+    ];
+
+    // Fronteras de Agencias MG Vecinas (No invadir en pauta)
+    const NEIGHBOR_MG = [
+      { name: 'MG Satélite', coords: [19.5295, -99.2275], note: 'Frontera Norte — Excluir pauta arriba de Satélite Centro' },
+      { name: 'MG Interlomas', coords: [19.4015, -99.2725], note: 'Frontera Poniente — No cruzar hacia Magnocentro' },
+      { name: 'MG Polanco', coords: [19.4322, -99.1935], note: 'Frontera Sur — Limitar pauta antes de Masaryk' },
+      { name: 'MG Azcapotzalco', coords: [19.4910, -99.1725], note: 'Frontera Oriente — No cruzar Av. de las Granjas' }
+    ];
+
+    // Benchmark Competitivo (INEGI 2025)
+    const BENCHMARK_DATA = [
+      {
+        model: 'MG5',
+        segment: 'Sedán Subcompacto',
+        mgVolume: '21,132 uds (Top 15)',
+        rivals: [
+          { name: 'Nissan Versa', vol: '90,223' },
+          { name: 'Chevrolet Aveo', vol: '61,066' },
+          { name: 'Kia K3 Sedán', vol: '46,551' },
+          { name: 'VW Virtus', vol: '25,040' }
+        ],
+        advantage: 'TOR',
+        advantageLabel: 'MG Toreo',
+        strategy: 'Volumen, flotillas PyME, plataformas (Uber/DiDi) y mensualidad accesible.'
+      },
+      {
+        model: 'MG3',
+        segment: 'Hatchback Subcompacto',
+        mgVolume: '10,391 uds',
+        rivals: [
+          { name: 'Nissan March', vol: '31,401' },
+          { name: 'Suzuki Swift', vol: '13,564' },
+          { name: 'Kia K3 HB', vol: '10,024' }
+        ],
+        advantage: 'BOTH',
+        advantageLabel: 'Ambas Sucursales',
+        strategy: 'Toreo: 1er auto/oficinistas. Lomas Verdes: versión Hybrid+ para universitarios.'
+      },
+      {
+        model: 'ZS',
+        segment: 'SUV Subcompacta (B-SUV)',
+        mgVolume: 'Modelo Ancla MG',
+        rivals: [
+          { name: 'Mazda CX-30', vol: '29,898' },
+          { name: 'Nissan Kicks', vol: '26,276' },
+          { name: 'Hyundai Creta', vol: '21,547' },
+          { name: 'VW Taos', vol: '21,189' }
+        ],
+        advantage: 'BOTH',
+        advantageLabel: 'Ambas (Ancla LV)',
+        strategy: 'Motor de volumen en Lomas Verdes (familias) y upgrade natural en Toreo.'
+      },
+      {
+        model: 'HS',
+        segment: 'SUV Compacta (C-SUV)',
+        mgVolume: 'Segmento Margen',
+        rivals: [
+          { name: 'VW Tiguan', vol: '19,419' },
+          { name: 'Nissan X-Trail', vol: '16,142' },
+          { name: 'Toyota RAV4', vol: '15,784' },
+          { name: 'Mazda CX-5', vol: '14,486' }
+        ],
+        advantage: 'LV',
+        advantageLabel: 'MG Lomas Verdes',
+        strategy: 'Conquista NSE A/B y C+ con mayor equipamiento/precio frente a japonesas y VW.'
+      },
+      {
+        model: 'RX9',
+        segment: 'SUV Mediana / 3 Filas',
+        mgVolume: 'Nicho Alto Margen',
+        rivals: [
+          { name: 'Toyota Highlander', vol: '6,059' },
+          { name: 'VW Teramont', vol: '5,493' },
+          { name: 'Mazda CX-90', vol: '2,899' }
+        ],
+        advantage: 'LV',
+        advantageLabel: 'MG Lomas Verdes',
+        strategy: 'Familias numerosas en Zona Esmeralda, Chiluca y Lomas Verdes (alto margen).'
+      }
+    ];
+
+    // Maestro de Códigos Postales (PMA)
+    const MASTER_CP_DATA = [
+      // MG Lomas Verdes
+      { cp: '53150', colonia: 'Santa Cruz Acatlán', branch: 'LV', ring: 1, nse: 'C+ / B', models: ['ZS', 'MG3', 'HS'] },
+      { cp: '53120-53129', colonia: 'Lomas Verdes 1ª a 6ª Sección', branch: 'LV', ring: 1, nse: 'A/B / C+', models: ['ZS', 'HS', 'RX9'] },
+      { cp: '53240', colonia: 'Jardines de San Mateo', branch: 'LV', ring: 1, nse: 'C+ / B', models: ['ZS', 'MG3', 'MG5'] },
+      { cp: '53140', colonia: 'Boulevares', branch: 'LV', ring: 1, nse: 'C+ / B', models: ['ZS', 'HS', 'MG3'] },
+      { cp: '53160', colonia: 'La Florida', branch: 'LV', ring: 1, nse: 'C+ / C', models: ['ZS', 'MG3', 'MG5'] },
+      { cp: '53310', colonia: 'Bosques de Echegaray', branch: 'LV', ring: 2, nse: 'C+ / B', models: ['ZS', 'HS', 'MG3'] },
+      { cp: '53100', colonia: 'Ciudad Satélite (Poniente/Sur)', branch: 'LV', ring: 2, nse: 'A/B / C+', models: ['HS', 'ZS', 'RX9'] },
+      { cp: '52930', colonia: 'Zona Esmeralda', branch: 'LV', ring: 3, nse: 'A/B', models: ['RX9', 'HS', 'ZS'] },
+      { cp: '52936', colonia: 'Condado de Sayavedra', branch: 'LV', ring: 3, nse: 'A/B', models: ['RX9', 'HS'] },
+      { cp: '52937', colonia: 'Chiluca / Prado Largo', branch: 'LV', ring: 3, nse: 'A/B', models: ['RX9', 'HS'] },
+      { cp: '52938', colonia: 'Lomas de Valle Escondido', branch: 'LV', ring: 3, nse: 'A/B', models: ['RX9', 'HS', 'ZS'] },
+
+      // MG Toreo
+      { cp: '53500', colonia: 'San Andrés Atoto', branch: 'TOR', ring: 1, nse: 'C / B2B', models: ['MG5', 'MG3', 'ZS'] },
+      { cp: '53370', colonia: 'Alce Blanco (Parque Industrial)', branch: 'TOR', ring: 1, nse: 'B2B / C', models: ['MG5', 'MG3', 'RX9'] },
+      { cp: '53560', colonia: 'El Conde / Parque Ind. Naucalpan', branch: 'TOR', ring: 1, nse: 'C / C-', models: ['MG5', 'MG3'] },
+      { cp: '11200', colonia: 'Lomas de Sotelo', branch: 'TOR', ring: 1, nse: 'C+ / C', models: ['MG3', 'ZS', 'MG5'] },
+      { cp: '11220', colonia: 'Periodista', branch: 'TOR', ring: 1, nse: 'C+ / C', models: ['MG3', 'ZS', 'MG5'] },
+      { cp: '53000', colonia: 'Naucalpan Centro', branch: 'TOR', ring: 2, nse: 'C / C-', models: ['MG5', 'MG3', 'ZS'] },
+      { cp: '53300', colonia: 'Hacienda de Echegaray Sur', branch: 'TOR', ring: 2, nse: 'C+ / C', models: ['ZS', 'MG3', 'HS'] },
+      { cp: '53950', colonia: 'Lomas de Tecamachalco', branch: 'TOR', ring: 2, nse: 'A/B / C+', models: ['HS', 'ZS', 'RX9'] },
+      { cp: '11230', colonia: 'Argentina Poniente', branch: 'TOR', ring: 2, nse: 'C / C-', models: ['MG5', 'MG3'] },
+      { cp: '11270', colonia: 'Legaria', branch: 'TOR', ring: 2, nse: 'C / C-', models: ['MG5', 'MG3', 'ZS'] },
+      { cp: '11500', colonia: 'Irrigación (Nuevo Polanco Norte)', branch: 'TOR', ring: 3, nse: 'C+ / Corp', models: ['MG3', 'ZS', 'HS'] }
+    ];
+
+    /**
+     * =========================================================================
+     * 2. ESTADO GLOBAL DE LA APLICACIÓN
+     * =========================================================================
+     */
+    const state = {
+      branch: 'ALL',        // 'ALL' | 'LV' | 'TOR'
+      model: 'ALL',         // 'ALL' | 'MG3' | 'MG5' | 'ZS' | 'HS' | 'RX9'
+      budgetLV: 65000,      // MXN mensual
+      budgetTOR: 55000,     // MXN mensual
+      activeTab: 'benchmark',
+      cpSearch: '',
+      layers: {
+        lvRings: true,
+        torRings: true,
+        btlPoints: true,
+        neighbors: true
+      }
+    };
+
+    // Referencias a instancias de gráficas y mapa
+    let mapInstance = null;
+    const mapLayerGroups = {};
+    const baseTileLayers = {};
+    let activeBaseLayerKey = 'streets';
+    let mixChart = null;
+    let funnelChart = null;
+    let ringsChart = null;
+
+    /**
+     * =========================================================================
+     * 3. UTILIDADES DE FORMATO Y NOTIFICACIONES
+     * =========================================================================
+     */
+    function formatMXN(value) {
+      return new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: 'MXN',
+        maximumFractionDigits: 0
+      }).format(value);
+    }
+
+    function formatNum(value) {
+      return new Intl.NumberFormat('es-MX').format(Math.round(value));
+    }
+
+    // Normaliza texto eliminando tildes/diacríticos para búsquedas precisas en español
+    function normalizeText(str) {
+      return String(str || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+    }
+
+    // Escapa comillas dobles y evita CSV Injection al exportar a Excel
+    function escapeCSVField(value) {
+      const str = String(value ?? '');
+      const safeStr = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+      return `"${safeStr.replace(/"/g, '""')}"`;
+    }
+
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const colorClass =
+        type === 'success'
+          ? 'bg-emerald-950/95 border-emerald-500/60 text-emerald-100'
+          : type === 'warning'
+          ? 'bg-amber-950/95 border-amber-500/60 text-amber-100'
+          : 'bg-slate-800/95 border-slate-600 text-slate-100';
+
+      toast.className = `toast-enter pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-xl text-xs font-medium ${colorClass}`;
+
+      const dot = document.createElement('span');
+      dot.className = `w-2 h-2 rounded-full shrink-0 ${
+        type === 'success' ? 'bg-emerald-400' : type === 'warning' ? 'bg-amber-400' : 'bg-cyan-400'
+      }`;
+
+      const textSpan = document.createElement('span');
+      textSpan.textContent = message;
+
+      toast.appendChild(dot);
+      toast.appendChild(textSpan);
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    /**
+     * =========================================================================
+     * 4. MOTOR DE CÁLCULO DE MÉTRICAS (DINÁMICO POR FILTROS Y PRESUPUESTO)
+     * =========================================================================
+     */
+    function computeMetrics() {
+      const selectedBranches = state.branch === 'ALL' ? ['LV', 'TOR'] : [state.branch];
+      const selectedModels = state.model === 'ALL' ? MODELS : [state.model];
+
+      let totalBudget = 0;
+      let totalLeads = 0;
+      let totalContacted = 0;
+      let totalAppointments = 0;
+      let totalTestDrives = 0;
+      let totalSales = 0;
+      let weightedEffSum = 0;
+
+      let lvLeads = 0;
+      let torLeads = 0;
+
+      selectedBranches.forEach((bKey) => {
+        const b = BRANCH_DATA[bKey];
+        const branchBudget = bKey === 'LV' ? state.budgetLV : state.budgetTOR;
+
+        selectedModels.forEach((mKey) => {
+          const share = b.mix[mKey] / 100;
+          const modelBudget = branchBudget * share;
+          const cpl = b.cplByModel[mKey];
+          const leads = modelBudget / cpl;
+
+          totalBudget += modelBudget;
+          totalLeads += leads;
+          totalContacted += leads * b.funnelRates.contacted;
+          totalAppointments += leads * b.funnelRates.appointment;
+          totalTestDrives += leads * b.funnelRates.testDrive;
+          totalSales += leads * b.funnelRates.sale;
+          weightedEffSum += leads * b.pmaEfficiency;
+
+          if (bKey === 'LV') lvLeads += leads;
+          if (bKey === 'TOR') torLeads += leads;
+        });
+      });
+
+      // Garantizar consistencia exacta: en modo ALL, totalLeads === lvLeads + torLeads
+      const roundedLV = Math.round(lvLeads);
+      const roundedTOR = Math.round(torLeads);
+      const roundedLeads = state.branch === 'ALL' ? roundedLV + roundedTOR : Math.round(totalLeads);
+      const roundedSales = roundedLeads > 0 ? Math.round(totalSales) : 0;
+      const avgEff = totalLeads > 0 ? weightedEffSum / totalLeads : 0;
+      const avgCPL = totalLeads > 0 ? totalBudget / totalLeads : 0;
+      const avgCPA = totalLeads > 0 && totalSales > 0 ? totalBudget / totalSales : 0;
+
+      return {
+        totalBudget,
+        totalLeads: roundedLeads,
+        lvLeads: roundedLV,
+        torLeads: roundedTOR,
+        totalContacted: Math.round(totalContacted),
+        totalAppointments: Math.round(totalAppointments),
+        totalTestDrives: Math.round(totalTestDrives),
+        totalSales: roundedSales,
+        pmaEfficiency: avgEff,
+        crossPct: roundedLeads > 0 ? 100 - avgEff : 0,
+        cpl: Number.isFinite(avgCPL) ? Math.round(avgCPL) : 0,
+        cpa: Number.isFinite(avgCPA) ? Math.round(avgCPA) : 0,
+        demoRate: totalLeads > 0 ? (totalTestDrives / totalLeads) * 100 : 0,
+        closeRate: totalLeads > 0 ? (totalSales / totalLeads) * 100 : 0
+      };
+    }
+
+    /**
+     * =========================================================================
+     * 5. ACTUALIZACIÓN DE TARJETAS KPI Y CONTEXTO
+     * =========================================================================
+     */
+    function updateKPIs() {
+      const m = computeMetrics();
+
+      // Etiqueta de contexto activo
+      const branchLabel =
+        state.branch === 'ALL'
+          ? 'Comparativo (Ambas Sucursales)'
+          : BRANCH_DATA[state.branch].name;
+      const modelLabel =
+        state.model === 'ALL' ? 'Todos los Modelos' : MODEL_LABELS[state.model];
+      document.getElementById('active-view-label').textContent = `${branchLabel} · ${modelLabel}`;
+
+      // KPI 1: Leads
+      document.getElementById('kpi-leads').textContent = formatNum(m.totalLeads);
+      if (state.branch === 'ALL') {
+        document.getElementById('kpi-leads-sub').textContent = `LV: ${formatNum(m.lvLeads)} · Toreo: ${formatNum(m.torLeads)}`;
+      } else {
+        document.getElementById('kpi-leads-sub').textContent = `Inversión: ${formatMXN(m.totalBudget)}`;
+      }
+
+      // KPI 2: Efectividad PMA
+      document.getElementById('kpi-pma-eff').textContent = `${m.pmaEfficiency.toFixed(1)}%`;
+      document.getElementById('kpi-pma-bar').style.width = `${m.pmaEfficiency.toFixed(1)}%`;
+      document.getElementById('kpi-pma-cross').textContent = `${m.crossPct.toFixed(1)}% cruzados`;
+
+      // KPI 3: Pruebas de Manejo / Ventas
+      document.getElementById('kpi-demos').textContent = formatNum(m.totalTestDrives);
+      document.getElementById('kpi-sales').textContent = formatNum(m.totalSales);
+      document.getElementById('kpi-conv-demo').textContent = `Tasa Prueba: ${m.demoRate.toFixed(1)}%`;
+      document.getElementById('kpi-conv-close').textContent = `Cierre s/Lead: ${m.closeRate.toFixed(1)}%`;
+
+      // KPI 4: CPL / CPA
+      document.getElementById('kpi-cpl').textContent = formatMXN(m.cpl);
+      document.getElementById('kpi-cpa').textContent = `${formatMXN(m.cpa)} MXN`;
+    }
+
+    /**
+     * =========================================================================
+     * 6. ACTUALIZACIÓN DEL SIMULADOR DE PRESUPUESTO
+     * =========================================================================
+     */
+    function updateSimulator() {
+      const total =
+        state.branch === 'LV'
+          ? state.budgetLV
+          : state.branch === 'TOR'
+          ? state.budgetTOR
+          : state.budgetLV + state.budgetTOR;
+      document.getElementById('sim-total-badge').textContent = `${formatMXN(total)} MXN`;
+
+      // Tabla por Modelo
+      const tbody = document.getElementById('sim-model-tbody');
+      tbody.innerHTML = '';
+
+      MODELS.forEach((mKey) => {
+        const lvAmt = (state.budgetLV * BRANCH_DATA.LV.mix[mKey]) / 100;
+        const torAmt = (state.budgetTOR * BRANCH_DATA.TOR.mix[mKey]) / 100;
+        const rowTotal =
+          state.branch === 'LV' ? lvAmt : state.branch === 'TOR' ? torAmt : lvAmt + torAmt;
+
+        const isHighlighted = state.model === mKey;
+        const tr = document.createElement('tr');
+        tr.className = isHighlighted
+          ? 'bg-mgRed/15 font-semibold transition-colors'
+          : 'hover:bg-slate-700/30 transition-colors';
+
+        tr.innerHTML = `
+          <td class="px-3 py-2 font-semibold text-white flex items-center gap-2">
+            <span>${MODEL_LABELS[mKey]}</span>
+            ${isHighlighted ? '<span class="w-1.5 h-1.5 rounded-full bg-mgRed"></span>' : ''}
+          </td>
+          <td class="px-3 py-2 text-right ${state.branch === 'TOR' ? 'text-slate-600' : 'text-slate-200'}">
+            ${formatMXN(lvAmt)} <span class="text-[10px] text-slate-400">(${BRANCH_DATA.LV.mix[mKey]}%)</span>
+          </td>
+          <td class="px-3 py-2 text-right ${state.branch === 'LV' ? 'text-slate-600' : 'text-slate-200'}">
+            ${formatMXN(torAmt)} <span class="text-[10px] text-slate-400">(${BRANCH_DATA.TOR.mix[mKey]}%)</span>
+          </td>
+          <td class="px-3 py-2 text-right font-bold text-emerald-400">
+            ${formatMXN(rowTotal)}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Tarjetas por Anillo Geográfico
+      const ringContainer = document.getElementById('sim-ring-cards');
+      ringContainer.innerHTML = '';
+
+      [0, 1, 2].forEach((idx) => {
+        const rNum = idx + 1;
+        const lvRingAmt = (state.budgetLV * BRANCH_DATA.LV.rings[idx].pct) / 100;
+        const torRingAmt = (state.budgetTOR * BRANCH_DATA.TOR.rings[idx].pct) / 100;
+        const combined =
+          state.branch === 'LV' ? lvRingAmt : state.branch === 'TOR' ? torRingAmt : lvRingAmt + torRingAmt;
+
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900/70 border border-slate-700/70 rounded-xl p-2.5 text-center';
+        card.innerHTML = `
+          <p class="text-[10px] font-semibold uppercase text-slate-400">Anillo ${rNum}</p>
+          <p class="text-sm font-extrabold text-white mt-0.5">${formatMXN(combined)}</p>
+          <p class="text-[10px] text-slate-400 mt-1">
+            <span class="text-red-400">LV ${BRANCH_DATA.LV.rings[idx].pct}%</span> ·
+            <span class="text-cyan-400">T ${BRANCH_DATA.TOR.rings[idx].pct}%</span>
+          </p>
+        `;
+        ringContainer.appendChild(card);
+      });
+    }
+
+    /**
+     * =========================================================================
+     * 7. MAPA INTERACTIVO LEAFLET.JS
+     * =========================================================================
+     */
+    function initMap() {
+      const mapEl = document.getElementById('pma-map');
+      if (typeof L === 'undefined') {
+        if (mapEl) {
+          mapEl.innerHTML = `
+            <div class="w-full h-full flex flex-col items-center justify-center text-center p-6 bg-slate-900 text-slate-400 text-xs">
+              <p class="font-semibold text-slate-200 mb-1">No se pudo cargar la librería de mapas (Leaflet).</p>
+              <p>Verifica tu conexión a internet para visualizar los anillos territoriales.</p>
+            </div>
+          `;
+        }
+        return;
+      }
+
+      try {
+        mapInstance = L.map('pma-map', {
+          center: [19.482, -99.235],
+          zoom: 13,
+          zoomControl: true
+        });
+
+        // Capas base estilo Google Maps en español (Calles con POIs y Satélite Híbrido)
+        baseTileLayers.streets = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&hl=es&x={x}&y={y}&z={z}', {
+          subdomains: ['0', '1', '2', '3'],
+          attribution: '&copy; Google Maps',
+          maxZoom: 20
+        });
+
+        baseTileLayers.satellite = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&hl=es&x={x}&y={y}&z={z}', {
+          subdomains: ['0', '1', '2', '3'],
+          attribution: '&copy; Google Maps',
+          maxZoom: 20
+        });
+
+        // Respaldo automático a Esri si los tiles de Google llegaran a fallar
+        let tileErrorCount = 0;
+        let fallbackActivated = false;
+        baseTileLayers.streets.on('tileerror', () => {
+          tileErrorCount += 1;
+          if (tileErrorCount >= 4 && !fallbackActivated && activeBaseLayerKey !== 'satellite') {
+            fallbackActivated = true;
+            mapInstance.removeLayer(baseTileLayers.streets);
+            baseTileLayers.streets = L.tileLayer(
+              'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+              { attribution: '&copy; Esri', maxZoom: 19 }
+            ).addTo(mapInstance);
+          }
+        });
+
+        // Cargar vista Calles (Google Maps) por defecto
+        baseTileLayers.streets.addTo(mapInstance);
+
+        // Inicializar grupos de capas
+        mapLayerGroups.lvRings = L.layerGroup().addTo(mapInstance);
+        mapLayerGroups.torRings = L.layerGroup().addTo(mapInstance);
+        mapLayerGroups.btlPoints = L.layerGroup().addTo(mapInstance);
+        mapLayerGroups.neighbors = L.layerGroup().addTo(mapInstance);
+        mapLayerGroups.dealers = L.layerGroup().addTo(mapInstance);
+
+        // Dibujar Anillos MG Lomas Verdes (opacidad ligera para leer calles y colonias)
+        const lvOpacities = [0.16, 0.09, 0.04];
+        [...BRANCH_DATA.LV.rings].reverse().forEach((r, revIdx) => {
+          const origIdx = 2 - revIdx;
+          L.circle(BRANCH_DATA.LV.coords, {
+            radius: r.radiusKm * 1000,
+            color: '#DC2626',
+            weight: origIdx === 0 ? 2.5 : 1.5,
+            dashArray: origIdx === 2 ? '6 6' : null,
+            fillColor: '#E30613',
+            fillOpacity: lvOpacities[origIdx]
+          })
+            .bindPopup(`
+              <div class="text-xs space-y-1">
+                <p class="font-bold text-red-400">MG Lomas Verdes · ${r.label}</p>
+                <p><strong>Radio:</strong> ${r.radiusKm} km</p>
+                <p><strong>Presupuesto Pauta:</strong> ${r.pct}% del total sucursal</p>
+                <p class="text-slate-400">Enfoque: SUVs (ZS, HS, RX9) e Híbridos</p>
+              </div>
+            `)
+            .addTo(mapLayerGroups.lvRings);
+        });
+
+        // Dibujar Anillos MG Toreo (opacidad ligera para leer calles y colonias)
+        const torOpacities = [0.16, 0.09, 0.04];
+        [...BRANCH_DATA.TOR.rings].reverse().forEach((r, revIdx) => {
+          const origIdx = 2 - revIdx;
+          L.circle(BRANCH_DATA.TOR.coords, {
+            radius: r.radiusKm * 1000,
+            color: '#0284c7',
+            weight: origIdx === 0 ? 2.5 : 1.5,
+            dashArray: origIdx === 2 ? '6 6' : null,
+            fillColor: '#06b6d4',
+            fillOpacity: torOpacities[origIdx]
+          })
+            .bindPopup(`
+              <div class="text-xs space-y-1">
+                <p class="font-bold text-cyan-400">MG Toreo · ${r.label}</p>
+                <p><strong>Radio:</strong> ${r.radiusKm} km</p>
+                <p><strong>Presupuesto Pauta:</strong> ${r.pct}% del total sucursal</p>
+                <p class="text-slate-400">Enfoque: Volumen (MG5, MG3, ZS) y B2B</p>
+              </div>
+            `)
+            .addTo(mapLayerGroups.torRings);
+        });
+        // Marcadores Principales de Sucursales (Iconos personalizados con ancho completo y popup sin solapamiento)
+        const createDealerIcon = (bgColor, label) =>
+          L.divIcon({
+            className: 'custom-dealer-pin',
+            html: `
+              <div style="background:${bgColor}; width:max-content;" class="px-2.5 py-1 rounded-lg border-2 border-white shadow-xl text-white font-extrabold text-[11px] whitespace-nowrap inline-flex items-center gap-1 -translate-x-1/2 -translate-y-1/2">
+                <span>MG</span>
+                <span class="font-semibold">${label}</span>
+              </div>
+            `,
+            iconSize: [0, 0],
+            popupAnchor: [0, -18]
+          });
+
+        L.marker(BRANCH_DATA.LV.coords, { icon: createDealerIcon('#E30613', 'Lomas Verdes'), zIndexOffset: 1000 })
+          .bindPopup(`
+            <div class="text-xs space-y-1 max-w-[220px]">
+              <p class="font-bold text-red-400 text-sm">MG Lomas Verdes</p>
+              <p class="text-slate-300">${BRANCH_DATA.LV.address}</p>
+              <p class="pt-1 border-t border-slate-700"><strong>Vocación:</strong> Residencial, SUVs, Híbridos y Alto Margen.</p>
+            </div>
+          `)
+          .addTo(mapLayerGroups.dealers);
+
+        L.marker(BRANCH_DATA.TOR.coords, { icon: createDealerIcon('#06b6d4', 'Toreo'), zIndexOffset: 1000 })
+          .bindPopup(`
+            <div class="text-xs space-y-1 max-w-[220px]">
+              <p class="font-bold text-cyan-400 text-sm">MG Toreo</p>
+              <p class="text-slate-300">${BRANCH_DATA.TOR.address}</p>
+              <p class="pt-1 border-t border-slate-700"><strong>Vocación:</strong> Alto Volumen, Periférico, B2B y Flotillas.</p>
+            </div>
+          `)
+          .addTo(mapLayerGroups.dealers);
+
+        // Marcadores Puntos BTL
+        BTL_POINTS.forEach((p) => {
+          L.circleMarker(p.coords, {
+            radius: 7,
+            color: '#064e3b',
+            weight: 2,
+            fillColor: '#10b981',
+            fillOpacity: 0.95
+          })
+            .bindPopup(`
+              <div class="text-xs space-y-1">
+                <span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold uppercase">Punto BTL</span>
+                <p class="font-bold text-white text-sm mt-1">${p.name}</p>
+                <p class="text-slate-300"><strong>Tipo:</strong> ${p.type}</p>
+                <p class="text-slate-300"><strong>Sucursal:</strong> ${p.branch === 'LV' ? 'MG Lomas Verdes' : 'MG Toreo'}</p>
+                <p class="text-emerald-300"><strong>Modelos sugeridos:</strong> ${p.focus}</p>
+              </div>
+            `)
+            .addTo(mapLayerGroups.btlPoints);
+        });
+
+        // Marcadores Fronteras Agencias MG Vecinas
+        NEIGHBOR_MG.forEach((n) => {
+          L.circleMarker(n.coords, {
+            radius: 7,
+            color: '#0f172a',
+            weight: 2,
+            fillColor: '#f59e0b',
+            fillOpacity: 0.95
+          })
+            .bindPopup(`
+              <div class="text-xs space-y-1">
+                <span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold uppercase">Frontera MG Vecina</span>
+                <p class="font-bold text-white text-sm mt-1">${n.name}</p>
+                <p class="text-amber-200">${n.note}</p>
+              </div>
+            `)
+            .addTo(mapLayerGroups.neighbors);
+        });
+      } catch (err) {
+        console.error('Error inicializando mapa Leaflet:', err);
+      }
+    }
+
+    function focusMapByBranch() {
+      if (!mapInstance) return;
+      if (state.branch === 'LV') {
+        mapInstance.flyTo(BRANCH_DATA.LV.coords, 13, { duration: 0.7 });
+      } else if (state.branch === 'TOR') {
+        mapInstance.flyTo(BRANCH_DATA.TOR.coords, 13, { duration: 0.7 });
+      } else {
+        mapInstance.flyTo([19.482, -99.235], 13, { duration: 0.7 });
+      }
+    }
+
+    /**
+     * =========================================================================
+     * 8. GRÁFICAS ANALÍTICAS (Chart.js)
+     * =========================================================================
+     */
+    const chartCommonOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: '#cbd5e1',
+            font: { family: 'Inter', size: 11 },
+            boxWidth: 12,
+            usePointStyle: true
+          }
+        },
+        tooltip: {
+          backgroundColor: '#0f172a',
+          titleColor: '#ffffff',
+          bodyColor: '#cbd5e1',
+          borderColor: '#334155',
+          borderWidth: 1,
+          padding: 10,
+          cornerRadius: 8
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#94a3b8', font: { family: 'Inter', size: 11 } },
+          grid: { color: 'rgba(51, 65, 85, 0.35)' }
+        },
+        y: {
+          ticks: { color: '#94a3b8', font: { family: 'Inter', size: 11 } },
+          grid: { color: 'rgba(51, 65, 85, 0.35)' }
+        }
+      }
+    };
+
+    function updateFunnelChart() {
+      try {
+        const m = computeMetrics();
+        const funnelValues = [
+          m.totalLeads,
+          m.totalContacted,
+          m.totalAppointments,
+          m.totalTestDrives,
+          m.totalSales
+        ];
+
+        if (funnelChart) {
+          funnelChart.data.datasets[0].data = funnelValues;
+          funnelChart.update('none');
+          return;
+        }
+
+        const funnelCtx = document.getElementById('chart-funnel').getContext('2d');
+        funnelChart = new Chart(funnelCtx, {
+          type: 'bar',
+          data: {
+            labels: ['Leads', 'Contactados', 'Citas', 'Pruebas Manejo', 'Ventas'],
+            datasets: [
+              {
+                label: 'Volumen Mensual',
+                data: funnelValues,
+                backgroundColor: [
+                  '#3b82f6',
+                  '#06b6d4',
+                  '#8b5cf6',
+                  '#f59e0b',
+                  '#10b981'
+                ],
+                borderRadius: 6
+              }
+            ]
+          },
+          options: {
+            ...chartCommonOptions,
+            indexAxis: 'y',
+            plugins: {
+              ...chartCommonOptions.plugins,
+              legend: { display: false },
+              tooltip: {
+                ...chartCommonOptions.plugins.tooltip,
+                callbacks: {
+                  label: (ctx) => ` ${ctx.dataset.label}: ${formatNum(ctx.parsed.x)}`
+                }
+              }
+            }
+          }
+        });
+      } catch (err) {
+        console.error('Error actualizando gráfica de embudo:', err);
+      }
+    }
+
+    function updateCharts() {
+      if (typeof Chart === 'undefined') return;
+      try {
+        // --- GRÁFICA 1: MIX DE VENTAS OBJETIVO POR MODELO (%) ---
+        const mixCtx = document.getElementById('chart-mix').getContext('2d');
+        const labels = MODELS.map((m) => MODEL_LABELS[m]);
+        const datasetsMix = [];
+
+        if (state.branch === 'ALL' || state.branch === 'LV') {
+          datasetsMix.push({
+            label: 'MG Lomas Verdes (%)',
+            data: MODELS.map((m) => BRANCH_DATA.LV.mix[m]),
+            backgroundColor: MODELS.map((m) =>
+              state.model === 'ALL' || state.model === m ? '#E30613' : 'rgba(227, 6, 19, 0.25)'
+            ),
+            borderRadius: 6
+          });
+        }
+        if (state.branch === 'ALL' || state.branch === 'TOR') {
+          datasetsMix.push({
+            label: 'MG Toreo (%)',
+            data: MODELS.map((m) => BRANCH_DATA.TOR.mix[m]),
+            backgroundColor: MODELS.map((m) =>
+              state.model === 'ALL' || state.model === m ? '#06b6d4' : 'rgba(6, 182, 212, 0.25)'
+            ),
+            borderRadius: 6
+          });
+        }
+
+        if (mixChart) mixChart.destroy();
+        mixChart = new Chart(mixCtx, {
+          type: 'bar',
+          data: { labels, datasets: datasetsMix },
+          options: {
+            ...chartCommonOptions,
+            plugins: {
+              ...chartCommonOptions.plugins,
+              tooltip: {
+                ...chartCommonOptions.plugins.tooltip,
+                callbacks: {
+                  label: (ctx) => ` ${ctx.dataset.label.replace(' (%)', '')}: ${ctx.parsed.y}%`
+                }
+              }
+            },
+            scales: {
+              ...chartCommonOptions.scales,
+              y: {
+                ...chartCommonOptions.scales.y,
+                beginAtZero: true,
+                max: 40,
+                ticks: {
+                  color: '#94a3b8',
+                  callback: (v) => v + '%'
+                }
+              }
+            }
+          }
+        });
+
+        // --- GRÁFICA 2: EMBUDO DE CONVERSIÓN COMERCIAL ---
+        updateFunnelChart();
+
+        // --- GRÁFICA 3: DISTRIBUCIÓN DE PAUTA POR ANILLO GEOGRÁFICO ---
+        const ringsCtx = document.getElementById('chart-rings').getContext('2d');
+        const ringDatasets = [];
+
+        if (state.branch === 'ALL' || state.branch === 'LV') {
+          ringDatasets.push({
+            label: 'Lomas Verdes (%)',
+            data: BRANCH_DATA.LV.rings.map((r) => r.pct),
+            backgroundColor: '#E30613',
+            borderRadius: 6
+          });
+        }
+        if (state.branch === 'ALL' || state.branch === 'TOR') {
+          ringDatasets.push({
+            label: 'Toreo (%)',
+            data: BRANCH_DATA.TOR.rings.map((r) => r.pct),
+            backgroundColor: '#06b6d4',
+            borderRadius: 6
+          });
+        }
+
+        if (ringsChart) ringsChart.destroy();
+        ringsChart = new Chart(ringsCtx, {
+          type: 'bar',
+          data: {
+            labels: ['Anillo 1 (Núcleo)', 'Anillo 2 (Consolidación)', 'Anillo 3 (Expansión)'],
+            datasets: ringDatasets
+          },
+          options: {
+            ...chartCommonOptions,
+            plugins: {
+              ...chartCommonOptions.plugins,
+              tooltip: {
+                ...chartCommonOptions.plugins.tooltip,
+                callbacks: {
+                  label: (ctx) => ` ${ctx.dataset.label.replace(' (%)', '')}: ${ctx.parsed.y}%`
+                }
+              }
+            },
+            scales: {
+              ...chartCommonOptions.scales,
+              y: {
+                ...chartCommonOptions.scales.y,
+                beginAtZero: true,
+                max: 60,
+                ticks: {
+                  color: '#94a3b8',
+                  callback: (v) => v + '%'
+                }
+              }
+            }
+          }
+        });
+      } catch (err) {
+        console.error('Error actualizando gráficas:', err);
+      }
+    }
+
+    /**
+     * =========================================================================
+     * 9. TABLAS INFERIORES (BENCHMARK Y MAESTRO DE CÓDIGOS POSTALES)
+     * =========================================================================
+     */
+    function getFilteredBenchmark() {
+      return BENCHMARK_DATA.filter((row) => {
+        if (state.model !== 'ALL' && row.model !== state.model) return false;
+        return true;
+      });
+    }
+
+    function renderBenchmarkTable() {
+      const rows = getFilteredBenchmark();
+      const tbody = document.getElementById('benchmark-tbody');
+      document.getElementById('benchmark-count').textContent = `Mostrando ${rows.length} modelo${rows.length === 1 ? '' : 's'}`;
+      tbody.innerHTML = '';
+
+      rows.forEach((row) => {
+        let badgeClass = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+        if (row.advantage === 'LV') badgeClass = 'bg-mgRed/20 text-red-300 border-mgRed/40';
+        if (row.advantage === 'TOR') badgeClass = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40';
+
+        const rivalsHtml = row.rivals
+          .map(
+            (r) =>
+              `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-900/90 border border-slate-700 text-[11px] text-slate-200 mr-1.5 mb-1">
+                ${r.name} <strong class="text-slate-400">(${r.vol})</strong>
+              </span>`
+          )
+          .join('');
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-700/30 transition-colors';
+        tr.innerHTML = `
+          <td class="px-4 py-3.5 font-extrabold text-white whitespace-nowrap">${MODEL_LABELS[row.model]}</td>
+          <td class="px-4 py-3.5 text-slate-300 whitespace-nowrap">${row.segment}</td>
+          <td class="px-4 py-3.5 font-semibold text-amber-300 whitespace-nowrap">${row.mgVolume}</td>
+          <td class="px-4 py-3.5"><div class="flex flex-wrap">${rivalsHtml}</div></td>
+          <td class="px-4 py-3.5 whitespace-nowrap">
+            <span class="px-2.5 py-1 rounded-full text-[11px] font-bold border ${badgeClass}">
+              ${row.advantageLabel}
+            </span>
+          </td>
+          <td class="px-4 py-3.5 text-xs text-slate-300 max-w-xs">${row.strategy}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function getFilteredCPs() {
+      const q = normalizeText(state.cpSearch.trim());
+      return MASTER_CP_DATA.filter((row) => {
+        if (state.branch !== 'ALL' && row.branch !== state.branch) return false;
+        if (state.model !== 'ALL' && !row.models.includes(state.model)) return false;
+        if (q) {
+          const haystack = normalizeText(
+            `${row.cp} ${row.colonia} ${row.nse} anillo ${row.ring} ${row.models.join(' ')} ${row.branch === 'LV' ? 'lomas verdes' : 'toreo'}`
+          );
+          if (!haystack.includes(q)) return false;
+        }
+        return true;
+      });
+    }
+
+    function renderCPTable() {
+      const rows = getFilteredCPs();
+      const tbody = document.getElementById('cp-tbody');
+      document.getElementById('cp-count').textContent = `${rows.length} zona${rows.length === 1 ? '' : 's'} encontrada${rows.length === 1 ? '' : 's'}`;
+      tbody.innerHTML = '';
+
+      if (rows.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="px-4 py-8 text-center text-slate-400">
+              No se encontraron códigos postales con los filtros o búsqueda actual.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      rows.forEach((row) => {
+        const isLV = row.branch === 'LV';
+        const branchBadge = isLV
+          ? '<span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-mgRed/20 text-red-300 border border-mgRed/40">MG Lomas Verdes</span>'
+          : '<span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">MG Toreo</span>';
+
+        const ringBadge =
+          row.ring === 1
+            ? '<span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 text-[11px] font-semibold">Anillo 1 (Núcleo)</span>'
+            : row.ring === 2
+            ? '<span class="px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 text-[11px] font-semibold">Anillo 2 (Consolidación)</span>'
+            : '<span class="px-2 py-0.5 rounded bg-slate-700 text-slate-300 text-[11px] font-semibold">Anillo 3 (Expansión)</span>';
+
+        const modelsHtml = row.models
+          .map(
+            (m) =>
+              `<span class="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-[11px] font-semibold text-white mr-1">${MODEL_LABELS[m]}</span>`
+          )
+          .join('');
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-700/30 transition-colors';
+        tr.innerHTML = `
+          <td class="px-4 py-3 font-mono font-bold text-white whitespace-nowrap">${row.cp}</td>
+          <td class="px-4 py-3 text-slate-200 font-medium">${row.colonia}</td>
+          <td class="px-4 py-3 whitespace-nowrap">${branchBadge}</td>
+          <td class="px-4 py-3 whitespace-nowrap">${ringBadge}</td>
+          <td class="px-4 py-3 text-slate-300 font-semibold whitespace-nowrap">${row.nse}</td>
+          <td class="px-4 py-3 whitespace-nowrap">${modelsHtml}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    /**
+     * =========================================================================
+     * 10. EXPORTACIÓN A CSV (CON BOM UTF-8 PARA EXCEL)
+     * =========================================================================
+     */
+    function exportActiveTabToCSV() {
+      try {
+        let csvRows = [];
+        let filename = '';
+
+        if (state.activeTab === 'cp') {
+          const rows = getFilteredCPs();
+          if (rows.length === 0) {
+            showToast('No hay códigos postales filtrados para exportar.', 'warning');
+            return;
+          }
+          csvRows.push(['Codigo_Postal', 'Colonia_Zona', 'Sucursal_Asignada', 'Anillo_PMA', 'NSE_Predominante', 'Modelos_Prioritarios']);
+          rows.forEach((r) => {
+            csvRows.push([
+              escapeCSVField(r.cp),
+              escapeCSVField(r.colonia),
+              escapeCSVField(r.branch === 'LV' ? 'MG Lomas Verdes' : 'MG Toreo'),
+              escapeCSVField(`Anillo ${r.ring}`),
+              escapeCSVField(r.nse),
+              escapeCSVField(r.models.join(', '))
+            ]);
+          });
+          filename = 'Maestro_CP_PMA_MG_CarOne.csv';
+        } else {
+          const rows = getFilteredBenchmark();
+          if (rows.length === 0) {
+            showToast('No hay registros de benchmark para exportar.', 'warning');
+            return;
+          }
+          csvRows.push(['Modelo_MG', 'Segmento', 'Volumen_MG_2025', 'Rivales_INEGI_2025', 'Ventaja_Competitiva', 'Enfoque_Comercial']);
+          rows.forEach((r) => {
+            const rivalsStr = r.rivals.map((rv) => `${rv.name} (${rv.vol})`).join(' | ');
+            csvRows.push([
+              escapeCSVField(MODEL_LABELS[r.model]),
+              escapeCSVField(r.segment),
+              escapeCSVField(r.mgVolume),
+              escapeCSVField(rivalsStr),
+              escapeCSVField(r.advantageLabel),
+              escapeCSVField(r.strategy)
+            ]);
+          });
+          filename = 'Benchmark_Competitivo_MG_CarOne.csv';
+        }
+
+        const csvContent = '\uFEFF' + csvRows.map((e) => e.join(',')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showToast(`Archivo "${filename}" descargado correctamente.`, 'success');
+      } catch (err) {
+        console.error('Error exportando CSV:', err);
+        showToast('No se pudo generar el archivo CSV.', 'warning');
+      }
+    }
+
+    /**
+     * =========================================================================
+     * 11. RENDERIZADO GLOBAL Y LISTENERS DE EVENTOS
+     * =========================================================================
+     */
+    function renderAll() {
+      updateKPIs();
+      updateSimulator();
+      updateCharts();
+      renderBenchmarkTable();
+      renderCPTable();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Renderizar iconos Lucide
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+
+      // Inicializar Mapa y Dashboard
+      initMap();
+      renderAll();
+
+      // Filtro de Sucursal
+      document.getElementById('filter-branch').addEventListener('change', (e) => {
+        state.branch = e.target.value;
+        renderAll();
+        focusMapByBranch();
+      });
+
+      // Filtro de Modelo
+      document.getElementById('filter-model').addEventListener('change', (e) => {
+        state.model = e.target.value;
+        renderAll();
+      });
+
+      // Botón Reset Filtros
+      document.getElementById('btn-reset-filters').addEventListener('click', () => {
+        state.branch = 'ALL';
+        state.model = 'ALL';
+        state.budgetLV = 65000;
+        state.budgetTOR = 55000;
+        state.cpSearch = '';
+
+        document.getElementById('filter-branch').value = 'ALL';
+        document.getElementById('filter-model').value = 'ALL';
+        document.getElementById('input-budget-lv').value = 65000;
+        document.getElementById('input-budget-tor').value = 55000;
+        document.getElementById('cp-search-input').value = '';
+
+        // Restaurar las 4 capas del mapa y sus botones
+        ['lvRings', 'torRings', 'btlPoints', 'neighbors'].forEach((layerKey) => {
+          state.layers[layerKey] = true;
+          if (mapInstance && mapLayerGroups[layerKey] && !mapInstance.hasLayer(mapLayerGroups[layerKey])) {
+            mapLayerGroups[layerKey].addTo(mapInstance);
+          }
+        });
+        document.querySelectorAll('.layer-toggle').forEach((btn) => {
+          btn.classList.remove('opacity-40');
+          btn.classList.add('active');
+        });
+
+        renderAll();
+        focusMapByBranch();
+        showToast('Filtros, capas y presupuestos restablecidos.', 'info');
+      });
+
+      // Inputs del Simulador de Presupuesto (con sanitización de rango y sin parpadeo)
+      const sanitizeBudget = (rawValue, inputEl) => {
+        const parsed = parseFloat(rawValue);
+        if (isNaN(parsed) || parsed < 0) return 0;
+        if (parsed > 5000000) {
+          inputEl.value = 5000000;
+          return 5000000;
+        }
+        return parsed;
+      };
+
+      document.getElementById('input-budget-lv').addEventListener('input', (e) => {
+        state.budgetLV = sanitizeBudget(e.target.value, e.target);
+        updateKPIs();
+        updateSimulator();
+        updateFunnelChart();
+      });
+
+      document.getElementById('input-budget-tor').addEventListener('input', (e) => {
+        state.budgetTOR = sanitizeBudget(e.target.value, e.target);
+        updateKPIs();
+        updateSimulator();
+        updateFunnelChart();
+      });
+
+      // Botón Centrar Mapa
+      document.getElementById('btn-center-map').addEventListener('click', () => {
+        if (mapInstance) {
+          mapInstance.flyTo([19.482, -99.235], 13, { duration: 0.6 });
+        }
+      });
+
+      // Selector de Estilo de Mapa (Calles / Satélite / Oscuro)
+      document.querySelectorAll('.map-style-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (!mapInstance) return;
+          const styleKey = btn.dataset.mapStyle;
+          if (styleKey === activeBaseLayerKey) return;
+
+          const mapEl = document.getElementById('pma-map');
+
+          // Limpiar capa base previa solo si cambia entre satélite y calles/oscuro
+          if (activeBaseLayerKey === 'satellite' && styleKey !== 'satellite') {
+            mapInstance.removeLayer(baseTileLayers.satellite);
+            baseTileLayers.streets.addTo(mapInstance);
+          } else if (activeBaseLayerKey !== 'satellite' && styleKey === 'satellite') {
+            mapInstance.removeLayer(baseTileLayers.streets);
+            baseTileLayers.satellite.addTo(mapInstance);
+          }
+
+          // Aplicar o quitar filtro oscuro
+          if (styleKey === 'dark') {
+            mapEl.classList.add('map-dark-filter');
+          } else {
+            mapEl.classList.remove('map-dark-filter');
+          }
+
+          activeBaseLayerKey = styleKey;
+
+          // Actualizar estado visual de los botones
+          document.querySelectorAll('.map-style-btn').forEach((b) => {
+            if (b.dataset.mapStyle === styleKey) {
+              b.className = 'map-style-btn px-2.5 py-1 rounded-md text-[11px] font-semibold bg-mgRed text-white transition-colors';
+            } else {
+              b.className = 'map-style-btn px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-300 hover:text-white transition-colors';
+            }
+          });
+        });
+      });
+
+      // Toggles de Capas del Mapa (con validación defensiva)
+      document.querySelectorAll('.layer-toggle').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const layerKey = btn.dataset.layer;
+          if (!mapInstance || !mapLayerGroups[layerKey]) return;
+
+          state.layers[layerKey] = !state.layers[layerKey];
+          btn.classList.toggle('active', state.layers[layerKey]);
+
+          if (state.layers[layerKey]) {
+            mapLayerGroups[layerKey].addTo(mapInstance);
+            btn.classList.remove('opacity-40');
+          } else {
+            mapInstance.removeLayer(mapLayerGroups[layerKey]);
+            btn.classList.add('opacity-40');
+          }
+        });
+      });
+
+      // Reajuste responsivo del mapa Leaflet al cambiar el tamaño de ventana
+      window.addEventListener('resize', () => {
+        if (mapInstance) {
+          mapInstance.invalidateSize();
+        }
+      });
+
+      // Pestañas (Tabs)
+      const tabBenchBtn = document.getElementById('tab-btn-benchmark');
+      const tabCpBtn = document.getElementById('tab-btn-cp');
+      const panelBench = document.getElementById('tab-panel-benchmark');
+      const panelCp = document.getElementById('tab-panel-cp');
+      const exportLabel = document.getElementById('export-btn-label');
+
+      function switchTab(tabName) {
+        state.activeTab = tabName;
+        if (tabName === 'benchmark') {
+          panelBench.classList.remove('hidden');
+          panelCp.classList.add('hidden');
+          tabBenchBtn.className = 'tab-btn active px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-mgRed text-white shadow-md shadow-mgRed/20';
+          tabCpBtn.className = 'tab-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700';
+          exportLabel.textContent = 'Exportar Benchmark CSV';
+        } else {
+          panelBench.classList.add('hidden');
+          panelCp.classList.remove('hidden');
+          tabCpBtn.className = 'tab-btn active px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-mgRed text-white shadow-md shadow-mgRed/20';
+          tabBenchBtn.className = 'tab-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700';
+          exportLabel.textContent = 'Exportar Maestro CP CSV';
+        }
+      }
+
+      tabBenchBtn.addEventListener('click', () => switchTab('benchmark'));
+      tabCpBtn.addEventListener('click', () => switchTab('cp'));
+
+      // Buscador en tiempo real del Maestro CP
+      document.getElementById('cp-search-input').addEventListener('input', (e) => {
+        state.cpSearch = e.target.value;
+        renderCPTable();
+      });
+
+      // Botón Exportar CSV
+      document.getElementById('btn-export-csv').addEventListener('click', exportActiveTabToCSV);
+    });
+  </script>
+</body>
+</html>
